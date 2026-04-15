@@ -1,0 +1,41 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "openedx-sso-gateway"
+version = "1.0.0"
+description = "Open edX plugin: auto-registration and auto-enrollment from external SSO platforms."
+readme = "README.md"
+requires-python = ">=3.8"
+license = { text = "MIT" }
+authors = [{ name = "EMI / MéxicoX", email = "soporte@mexicox.gob.mx" }]
+keywords = ["open edx", "tutor", "sso", "enrollment", "oauth2", "llavemx"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Framework :: Django",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.11",
+    "Topic :: Education",
+]
+dependencies = [
+    "Django>=3.2",
+]
+
+[project.urls]
+Homepage = "https://github.com/aprendemx/openedx-sso-gateway"
+Issues   = "https://github.com/aprendemx/openedx-sso-gateway/issues"
+
+[project.entry-points."lms.djangoapp"]
+sso_gateway = "sso_gateway.apps:SSOGatewayConfig"
+
+[project.entry-points."tutor.plugin.v1"]
+sso_gateway = "tutor_plugin"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["sso_gateway*"]
