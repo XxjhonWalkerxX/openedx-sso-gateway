@@ -34,7 +34,7 @@ Issues   = "https://github.com/aprendemx/openedx-sso-gateway/issues"
 sso_gateway = "sso_gateway.apps:SSOGatewayConfig"
 
 [project.entry-points."tutor.plugin.v1"]
-sso_gateway = "tutor_plugin"
+sso_gateway = "sso_gateway.tutor_plugin"
 
 [tool.setuptools.packages.find]
 where = ["."]
