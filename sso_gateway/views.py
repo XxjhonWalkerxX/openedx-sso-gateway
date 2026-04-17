@@ -31,12 +31,14 @@ def _verify_saberes_token(token):
         return None, "public key no configurada"
 
     try:
+        # Deriva el audience del dominio configurado en Open edX — automático por ambiente
+        audience = getattr(settings, 'LMS_BASE', None) or request.get_host()
         payload = jwt.decode(
             token,
             public_key,
             algorithms=["RS256"],
             issuer="saberesmx",
-            audience="cursos.aprende.gob.mx",
+            audience=audience,
             options={"require": ["exp", "iss", "aud", "jti", "course_id"]},
         )
         return payload, None
