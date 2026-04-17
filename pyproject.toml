@@ -24,6 +24,8 @@ classifiers = [
 ]
 dependencies = [
     "Django>=3.2",
+    "PyJWT>=2.0.0",
+    "cryptography>=3.4.0",
 ]
 
 [project.urls]
@@ -39,3 +41,6 @@ sso_gateway = "sso_gateway.tutor_plugin"
 [tool.setuptools.packages.find]
 where = ["."]
 include = ["sso_gateway*"]
+
+[tool.setuptools.package-data]
+sso_gateway = ["templates/**/*.html"]

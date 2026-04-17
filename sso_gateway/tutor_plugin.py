@@ -1,13 +1,11 @@
 """
 Tutor plugin para SSO Gateway.
 
-Inyecta configuración de CORS/CSRF al LMS para que plataformas externas
-(saberesmx y otras) puedan consumir la Course API y redirigir usuarios.
-
 Configurar antes de usar:
 
     tutor config save \
-      --set SSO_GATEWAY_CLIENT_DOMAINS='["https://saberesmx.sep.gob.mx"]'
+      --set SSO_GATEWAY_CLIENT_DOMAINS='["https://saberesmx.sep.gob.mx"]' \
+      --set SSO_GATEWAY_SABERES_PUBLIC_KEY="$(cat /ruta/saberes_public.pem)"
 
     tutor local restart lms
 """
@@ -37,12 +35,15 @@ for _domain in _SSO_GATEWAY_DOMAINS:
     if _host not in CSRF_TRUSTED_ORIGINS:
         CSRF_TRUSTED_ORIGINS.append(_host)
 
-# LOGIN_REDIRECT_WHITELIST: necesario para que ?next=/enroll-redirect/
-# sobreviva el round-trip OAuth con Llave MX.
 LOGIN_REDIRECT_WHITELIST = list(LOGIN_REDIRECT_WHITELIST)
 for _domain in _SSO_GATEWAY_DOMAINS:
     _host = _domain.replace("https://", "").replace("http://", "")
     if _host not in LOGIN_REDIRECT_WHITELIST:
         LOGIN_REDIRECT_WHITELIST.append(_host)
+
+# ----- JWT RS256: llave pública de saberesmx -----
+# saberesmx firma sus tokens con su private key.
+# Aquí solo necesitas su public key para verificar.
+SSO_GATEWAY_SABERES_PUBLIC_KEY = os.environ.get("SSO_GATEWAY_SABERES_PUBLIC_KEY", "")
 """,
 ))
