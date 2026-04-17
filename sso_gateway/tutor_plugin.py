@@ -11,24 +11,26 @@ Configurar antes de usar:
 """
 from tutor import hooks
 
+# Registrar variables con sus defaults en config.yml de Tutor
+hooks.Filters.CONFIG_DEFAULTS.add_items([
+    ("SSO_GATEWAY_CLIENT_DOMAINS",     []),
+    ("SSO_GATEWAY_SABERES_PUBLIC_KEY", ""),
+])
+
+# Inyectar en Django settings del LMS — mismo patrón que llavemx_mobile_bridge
 hooks.Filters.ENV_PATCHES.add_item((
     "openedx-lms-common-settings",
     """
-import os
-import json
+# SSO Gateway — configuración inyectada por Tutor
+SSO_GATEWAY_SABERES_PUBLIC_KEY = {{ SSO_GATEWAY_SABERES_PUBLIC_KEY | tojson }}
 
-# ----- Plataformas externas autorizadas (saberesmx y futuras) -----
-_SSO_GATEWAY_DOMAINS = json.loads(
-    os.environ.get("SSO_GATEWAY_CLIENT_DOMAINS", "[]")
-)
+_SSO_GATEWAY_DOMAINS = {{ SSO_GATEWAY_CLIENT_DOMAINS | tojson }}
 
-# CORS: permite que plataformas externas consuman GET /api/courses/v1/courses/
 CORS_ORIGIN_WHITELIST = list(CORS_ORIGIN_WHITELIST)
 for _domain in _SSO_GATEWAY_DOMAINS:
     if _domain not in CORS_ORIGIN_WHITELIST:
         CORS_ORIGIN_WHITELIST.append(_domain)
 
-# CSRF: cubre el POST /api/courses/v1/courses/ (filtrado de cursos)
 CSRF_TRUSTED_ORIGINS = list(CSRF_TRUSTED_ORIGINS)
 for _domain in _SSO_GATEWAY_DOMAINS:
     _host = _domain.replace("https://", "").replace("http://", "")
@@ -40,10 +42,5 @@ for _domain in _SSO_GATEWAY_DOMAINS:
     _host = _domain.replace("https://", "").replace("http://", "")
     if _host not in LOGIN_REDIRECT_WHITELIST:
         LOGIN_REDIRECT_WHITELIST.append(_host)
-
-# ----- JWT RS256: llave pública de saberesmx -----
-# saberesmx firma sus tokens con su private key.
-# Aquí solo necesitas su public key para verificar.
-SSO_GATEWAY_SABERES_PUBLIC_KEY = os.environ.get("SSO_GATEWAY_SABERES_PUBLIC_KEY", "")
 """,
 ))
