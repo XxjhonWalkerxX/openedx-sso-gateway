@@ -71,6 +71,58 @@ _SABERES_NIVEL_TO_CODE = {
     'doctorado':                      '8',
 }
 
+# Función docente de saberes → funcion ExtraInfo (funcionList MFE)
+_SABERES_FUNCION_TO_CODE = {
+    'docente frente a grupo':     '0',
+    'docente':                    '0',
+    'administrativas':            '1',
+    'administrativo':             '1',
+    'directivas':                 '2',
+    'director':                   '2',
+    'directivo':                  '2',
+    'técnicas':                   '3',
+    'tecnicas':                   '3',
+    'otras':                      '4',
+    'otro':                       '4',
+    'supervisión':                '5',
+    'supervision':                '5',
+    'supervisor':                 '5',
+    'asesor técnico pedagógico':  '6',
+    'asesor tecnico pedagogico':  '6',
+    'atp':                        '6',
+}
+
+# Nivel laboral docente de saberes → nivel_Educativo ExtraInfo (nivelList MFE)
+_SABERES_NIVEL_LABORAL_TO_CODE = {
+    'preescolar':                        '0',
+    'educación preescolar':              '0',
+    'primaria':                          '1',
+    'educación primaria':                '1',
+    'secundaria':                        '2',
+    'educación secundaria':              '2',
+    'media superior':                    '3',
+    'bachillerato':                      '3',
+    'educación media superior':          '3',
+    'superior':                          '4',
+    'universidad':                       '4',
+    'educación superior':                '4',
+    'formación docente':                 '5',
+    'formacion docente':                 '5',
+    'normal':                            '5',
+    'escuela normal':                    '5',
+    'especial':                          '6',
+    'educación especial':                '6',
+    'indígena':                          '7',
+    'indigena':                          '7',
+    'educación indígena':                '7',
+    'adultos':                           '8',
+    'educación para adultos':            '8',
+    'educacion para adultos':            '8',
+    'capacitación para el trabajo':      '9',
+    'capacitacion para el trabajo':      '9',
+    'capacitación trabajo':              '9',
+}
+
 
 def _map_estado(texto):
     return _SABERES_ESTADO_TO_CODE.get((texto or '').lower().strip(), '0')
@@ -82,6 +134,14 @@ def _map_ocupacion(texto):
 
 def _map_nivel(texto):
     return _SABERES_NIVEL_TO_CODE.get((texto or '').lower().strip(), '0')
+
+
+def _map_funcion(texto):
+    return _SABERES_FUNCION_TO_CODE.get((texto or '').lower().strip(), '')
+
+
+def _map_nivel_laboral(texto):
+    return _SABERES_NIVEL_LABORAL_TO_CODE.get((texto or '').lower().strip(), '')
 
 
 def _set_if_empty(instance, field, new_value):
@@ -168,6 +228,18 @@ def fill_extrainfo_from_details(backend, details, user=None, is_new=False, *args
     if eres_docente and not extrainfo.eres_docente:
         extrainfo.eres_docente = True
         changed.append('eres_docente')
+
+    # --- Campos docente (solo si eres_docente=True en Saberes) ---
+    if eres_docente:
+        cct            = (saberes.get('cct') or '').strip().upper()
+        funcion_code   = _map_funcion(saberes.get('funcion', ''))
+        nivel_lab_code = _map_nivel_laboral(saberes.get('nivel_laboral', ''))
+        asignatura     = (saberes.get('asignatura') or '').strip()
+
+        if _set_if_empty(extrainfo, 'cct', cct):                         changed.append('cct')
+        if funcion_code   and _set_if_empty(extrainfo, 'funcion', funcion_code):       changed.append('funcion')
+        if nivel_lab_code and _set_if_empty(extrainfo, 'nivel_Educativo', nivel_lab_code): changed.append('nivel_Educativo')
+        if _set_if_empty(extrainfo, 'asignatura', asignatura):           changed.append('asignatura')
 
     if changed:
         extrainfo.save(update_fields=changed)
@@ -271,6 +343,13 @@ def enrich_llavemx_details_from_saberes(backend, details=None, *args, **kwargs):
         details['eres_docente'] = True
         changed.append('eres_docente')
 
+        # Campos docente — pasan tal cual al MFE para pre-llenar el form
+        for field in ('cct', 'funcion', 'nivel_laboral', 'asignatura'):
+            val = saberes.get(field)
+            if val:
+                details[field] = val
+                changed.append(field)
+
     if not changed:
         return
 
@@ -285,7 +364,10 @@ def enrich_llavemx_details_from_saberes(backend, details=None, *args, **kwargs):
     logger.info(
         "[SSOGateway] enrich_saberes: campos actualizados=%s valores=%s",
         changed,
-        {k: saberes.get(k) for k in ('estado', 'ocupacion', 'maximo_nivel', 'eres_docente')},
+        {k: saberes.get(k) for k in (
+            'estado', 'ocupacion', 'maximo_nivel', 'eres_docente',
+            'cct', 'funcion', 'nivel_laboral', 'asignatura',
+        )},
     )
 
     # Retornar details actualizado actualiza el partial pipeline que el MFE leerá

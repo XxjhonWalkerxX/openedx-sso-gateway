@@ -18,7 +18,7 @@ _ERROR_TEMPLATE = 'sso_gateway/error.html'
 _ERROR_MSG_GENERICO = 'No fue posible procesar tu solicitud. Intenta desde saberesmx nuevamente.'
 
 
-def _verify_saberes_token(token):
+def _verify_saberes_token(token, request):
     """
     Verifica JWT de saberesmx.
     Valida: firma RS256, iss, aud, exp, jti, course_id.
@@ -30,9 +30,9 @@ def _verify_saberes_token(token):
         logger.error("[SSOGateway] SSO_GATEWAY_SABERES_PUBLIC_KEY no configurado.")
         return None, "public key no configurada"
 
+    audience = getattr(settings, 'LMS_BASE', None) or request.get_host()
+
     try:
-        # Deriva el audience del dominio configurado en Open edX — automático por ambiente
-        audience = getattr(settings, 'LMS_BASE', None) or request.get_host()
         payload = jwt.decode(
             token,
             public_key,
@@ -112,7 +112,7 @@ class EnrollRedirectView(View):
     # ------------------------------------------------------------------
 
     def _handle_token_flow(self, request, token):
-        payload, error = _verify_saberes_token(token)
+        payload, error = _verify_saberes_token(token, request)
         if not payload:
             return self._bad_request(request, f"JWT rechazado: {error}")
 
@@ -143,6 +143,14 @@ class EnrollRedirectView(View):
             'eres_docente': bool(payload.get('eres_docente', False)),
             'source':      'saberesmx',
         }
+
+        if saberes_data['eres_docente']:
+            saberes_data.update({
+                'cct':           payload.get('cct', ''),
+                'funcion':       payload.get('funcion', ''),
+                'nivel_laboral': payload.get('nivel_laboral', ''),
+                'asignatura':    payload.get('asignatura', ''),
+            })
 
         if not request.user.is_authenticated:
             return self._redirect_to_sso(request, course_id, saberes_data)
