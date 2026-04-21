@@ -228,6 +228,53 @@ def enroll_pending_course(backend, user=None, *args, **kwargs):
         )
 
 
+def enrich_llavemx_details_from_saberes(backend, *args, **kwargs):
+    """
+    Copia estado/ocupacion/maximo_nivel/eres_docente de sso_gateway_saberes_data
+    hacia llavemx_details en sesión, para que el MFE los pre-rellene en el
+    formulario de registro.
+
+    Debe ejecutarse DESPUÉS de preserve_llavemx_details (llavemx plugin).
+    Solo aplica cuando el backend es llavemx y hay datos de Saberes en sesión.
+    """
+    if getattr(backend, 'name', None) != 'llavemx':
+        return
+
+    request = kwargs.get('request') or getattr(backend.strategy, 'request', None)
+    if not request:
+        return
+
+    saberes = request.session.get(SESSION_SABERES_KEY) or {}
+    if not saberes:
+        return
+
+    llavemx_details = request.session.get('llavemx_details') or {}
+
+    updated = False
+
+    # estado: Saberes tiene el estado del perfil del usuario — más relevante que
+    # el domicilio que manda Llave MX
+    if saberes.get('estado') and not llavemx_details.get('estado'):
+        llavemx_details['estado'] = saberes['estado']
+        updated = True
+
+    for field in ('ocupacion', 'maximo_nivel', 'eres_docente'):
+        val = saberes.get(field)
+        if val is not None and val != '' and not llavemx_details.get(field):
+            llavemx_details[field] = val
+            updated = True
+
+    if updated:
+        try:
+            backend.strategy.session_set('llavemx_details', llavemx_details)
+            logger.info(
+                "[SSOGateway] llavemx_details enriquecido con datos Saberes: %s",
+                {k: saberes.get(k) for k in ('estado', 'ocupacion', 'maximo_nivel', 'eres_docente')},
+            )
+        except Exception as exc:
+            logger.warning("[SSOGateway] No se pudo actualizar llavemx_details: %s", exc)
+
+
 def _set_user_source(user, source):
     """Guarda la fuente de registro en UserAttribute."""
     try:
