@@ -279,7 +279,8 @@ def enroll_pending_course(backend, user=None, *args, **kwargs):
         from common.djangoapps.student.models import CourseEnrollment, CourseEnrollmentAttribute
 
         course_key = CourseKey.from_string(course_id)
-        enrollment, created = CourseEnrollment.enroll(user, course_key, check_access=True)
+        was_enrolled = CourseEnrollment.is_enrolled(user, course_key)
+        enrollment = CourseEnrollment.enroll(user, course_key, check_access=True)
 
         CourseEnrollmentAttribute.objects.update_or_create(
             enrollment=enrollment,
@@ -290,7 +291,7 @@ def enroll_pending_course(backend, user=None, *args, **kwargs):
 
         logger.info(
             "[SSOGateway] %s user_id=%s course=%s source=%s",
-            'Inscrito' if created else 'Ya inscrito',
+            'Ya inscrito' if was_enrolled else 'Inscrito',
             user.id, course_id, source,
         )
     except Exception as exc:

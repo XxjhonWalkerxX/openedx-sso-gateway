@@ -163,7 +163,8 @@ class EnrollRedirectView(View):
         if saberes_data:
             request.session[SESSION_SABERES_KEY] = saberes_data
 
-        next_url = f'/enroll-redirect/?course_id={course_id}'
+        # course_id trae `+` como separador — encodear para que no se interprete como espacio
+        next_url = '/enroll-redirect/?' + urlencode({'course_id': course_id})
         params = urlencode({'next': next_url})
 
         logger.info(
