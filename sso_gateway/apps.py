@@ -52,6 +52,13 @@ class SSOGatewayConfig(AppConfig):
 
         self._insert_step(
             pipeline,
+            step="sso_gateway.pipeline.enrich_llavemx_details_from_saberes",
+            after="social_core.pipeline.social_auth.load_extra_data",
+            before="sso_gateway.pipeline.fill_extrainfo_from_details",
+        )
+
+        self._insert_step(
+            pipeline,
             step="sso_gateway.pipeline.fill_extrainfo_from_details",
             after="social_core.pipeline.social_auth.load_extra_data",
             before="common.djangoapps.third_party_auth.pipeline.ensure_user_information",
