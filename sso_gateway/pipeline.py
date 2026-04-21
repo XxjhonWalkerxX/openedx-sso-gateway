@@ -228,51 +228,68 @@ def enroll_pending_course(backend, user=None, *args, **kwargs):
         )
 
 
-def enrich_llavemx_details_from_saberes(backend, *args, **kwargs):
+def enrich_llavemx_details_from_saberes(backend, details=None, *args, **kwargs):
     """
-    Copia estado/ocupacion/maximo_nivel/eres_docente de sso_gateway_saberes_data
-    hacia llavemx_details en sesión, para que el MFE los pre-rellene en el
-    formulario de registro.
+    Fusiona estado/ocupacion/maximo_nivel/eres_docente de sso_gateway_saberes_data
+    en los `details` del pipeline para que el partial guardado por social-auth
+    incluya los datos de Saberes — así el MFE los recibe en pipelineUserDetails.
 
-    Debe ejecutarse DESPUÉS de preserve_llavemx_details (llavemx plugin).
-    Solo aplica cuando el backend es llavemx y hay datos de Saberes en sesión.
+    También actualiza llavemx_details en sesión (fallback del plugin llavemx).
+
+    Debe correr DESPUÉS de preserve_llavemx_details y ANTES de fill_extrainfo_from_details.
     """
     if getattr(backend, 'name', None) != 'llavemx':
         return
 
     request = kwargs.get('request') or getattr(backend.strategy, 'request', None)
     if not request:
+        logger.warning("[SSOGateway] enrich_saberes: no hay request disponible.")
         return
 
     saberes = request.session.get(SESSION_SABERES_KEY) or {}
     if not saberes:
+        logger.debug("[SSOGateway] enrich_saberes: sin datos Saberes en sesión.")
         return
 
-    llavemx_details = request.session.get('llavemx_details') or {}
+    details = dict(details or {})
+    changed = []
 
-    updated = False
+    # estado: Saberes gana sobre Llave MX (domicilio vs perfil educativo)
+    if saberes.get('estado'):
+        details['estado'] = saberes['estado']
+        changed.append('estado')
 
-    # estado: Saberes tiene el estado del perfil del usuario — más relevante que
-    # el domicilio que manda Llave MX
-    if saberes.get('estado') and not llavemx_details.get('estado'):
-        llavemx_details['estado'] = saberes['estado']
-        updated = True
-
-    for field in ('ocupacion', 'maximo_nivel', 'eres_docente'):
+    # ocupacion y maximo_nivel: Llave MX los manda vacíos — Saberes los tiene
+    for field in ('ocupacion', 'maximo_nivel'):
         val = saberes.get(field)
-        if val is not None and val != '' and not llavemx_details.get(field):
-            llavemx_details[field] = val
-            updated = True
+        if val:
+            details[field] = val
+            changed.append(field)
 
-    if updated:
-        try:
-            backend.strategy.session_set('llavemx_details', llavemx_details)
-            logger.info(
-                "[SSOGateway] llavemx_details enriquecido con datos Saberes: %s",
-                {k: saberes.get(k) for k in ('estado', 'ocupacion', 'maximo_nivel', 'eres_docente')},
-            )
-        except Exception as exc:
-            logger.warning("[SSOGateway] No se pudo actualizar llavemx_details: %s", exc)
+    # eres_docente: solo activa, nunca desactiva
+    if saberes.get('eres_docente'):
+        details['eres_docente'] = True
+        changed.append('eres_docente')
+
+    if not changed:
+        return
+
+    # Actualizar llavemx_details en sesión (usado como fallback por el plugin llavemx)
+    try:
+        llavemx_details = dict(request.session.get('llavemx_details') or {})
+        llavemx_details.update({k: details[k] for k in changed})
+        backend.strategy.session_set('llavemx_details', llavemx_details)
+    except Exception as exc:
+        logger.warning("[SSOGateway] No se pudo actualizar llavemx_details en sesión: %s", exc)
+
+    logger.info(
+        "[SSOGateway] enrich_saberes: campos actualizados=%s valores=%s",
+        changed,
+        {k: saberes.get(k) for k in ('estado', 'ocupacion', 'maximo_nivel', 'eres_docente')},
+    )
+
+    # Retornar details actualizado actualiza el partial pipeline que el MFE leerá
+    return {'details': details}
 
 
 def _set_user_source(user, source):

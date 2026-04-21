@@ -50,25 +50,30 @@ class SSOGatewayConfig(AppConfig):
 
         pipeline = list(getattr(settings, "SOCIAL_AUTH_PIPELINE", []))
 
+        # enrich DEBE correr ANTES de ensure_user_information:
+        # el partial pipeline guardado al redirigir al MFE ya llevará los datos de Saberes.
         self._insert_step(
             pipeline,
             step="sso_gateway.pipeline.enrich_llavemx_details_from_saberes",
-            after="social_core.pipeline.social_auth.load_extra_data",
-            before="sso_gateway.pipeline.fill_extrainfo_from_details",
+            after="common.djangoapps.third_party_auth.pipeline.get_username",
+            before="common.djangoapps.third_party_auth.pipeline.ensure_user_information",
         )
 
+        # fill_extrainfo corre después de create_user (user existe) y load_extra_data.
         self._insert_step(
             pipeline,
             step="sso_gateway.pipeline.fill_extrainfo_from_details",
             after="social_core.pipeline.social_auth.load_extra_data",
-            before="common.djangoapps.third_party_auth.pipeline.ensure_user_information",
+            before=None,
         )
 
+        # enroll DESPUÉS de fill_extrainfo: ambos leen saberes de sesión.
+        # enroll hace session.pop() — debe ser el último en leer saberes.
         self._insert_step(
             pipeline,
             step="sso_gateway.pipeline.enroll_pending_course",
-            after="common.djangoapps.third_party_auth.pipeline.ensure_user_information",
-            before=None,  # append al final si no hay nada después
+            after="sso_gateway.pipeline.fill_extrainfo_from_details",
+            before=None,
         )
 
         setattr(settings, "SOCIAL_AUTH_PIPELINE", pipeline)
